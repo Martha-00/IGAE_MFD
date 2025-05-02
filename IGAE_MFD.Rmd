@@ -1,0 +1,1003 @@
+---
+title: ''
+output:
+  pdf_document: default
+  word_document: default
+lang: es
+header-includes:
+- \usepackage{pdflscape}
+- \newcommand{\blandscape}{\begin{landscape}}
+- \newcommand{\elandscape}{\end{landscape}}
+---
+
+---
+#######################
+# Portada
+#######################
+---
+
+\pagenumbering{gobble}
+
+```{r echo = FALSE, out.width = "90%", fig.align = 'center'}
+# Logo de CIMAT
+knitr::include_graphics("C:/IGAE_MFD/CIMAT_INEGI.png")
+```
+
+\vspace{2cm}
+\begin{center}
+\huge \textbf{Modelo de Factores Dinámicos aplicado al Indicador Global de la Actividad Económica (IGAE)}
+\end{center}
+\vspace{5cm}
+
+\Large
+\huge\textbf{Tema:} Series de tiempo\
+\huge\textbf{Elaboró:} Martha Aguilar Jiménez\
+\huge\textbf{Fecha:}\ Mayo de 2023
+\vspace{5cm}
+
+---
+#######################
+# Índice
+#######################
+---
+
+\pagebreak
+\tableofcontents
+
+---
+#######################
+# Cuerpo del documento
+#######################
+---
+
+\newpage
+\pagenumbering{arabic}
+
+## Introducción
+
+::: text-justify
+
+\normalsize
+
+
+Lo primero que se realiza es cargar las librerías que vamos a usar así como leer los datos.
+
+```{r echo = FALSE, message = FALSE, warning = FALSE}
+# Limpiar espacio de trabajo
+rm(list = ls())
+invisible(gc(reset = TRUE))
+
+# Se cargan las librerías
+library(ggplot2)  # Gráficos avanzados
+library(GGally)   # Gráficos de dispersión
+library(car)      # Modelos de regresión
+library(corrplot) # Matriz gráfica de correlaciones
+library(astsa)      # Gráfico de retrasos
+library(tseries)    # Prueba de ADF
+library(forecast)   # Pronósticos
+library(seasonal)   # Estacionalidad
+library(kableExtra) # Edición de tablas
+library(vars)       # Modelos VAR/VEC
+library(dlm)        # Análisis de modelos dinámicos lineales
+library(readr)      # Leer datos en R     
+library(psych)      #Usar función para  "describe"   
+```
+
+1.- Usando la base de datos (IGAE.csv) que refiere al Indicador Global de la Actividad Económica (IGAE) se realizará lo siguiente:
+
+1.1 Análisis exploratorio en conjunto de las series. ¿Se observan patrones comunes?
+1.2 Prueba de raíces unitarias individuales.
+1.3 Determinación del número de factores.
+1.4 Estimación de las componentes (matriz de pesos, factores y errores idiosincráticos) de un MFD a través de CP. Interpretación de estas.
+1.5 ¿Es consistente la estimación? ¿Por qué?
+
+
+**Variables:**
+
+- S11: Actividades primarias.
+- S21: Minería.
+- S22: Generación, transmisión y distribución de energía eléctrica, suministro de agua y de gas por ductos al consumidor final.
+- S23: Construcción.
+- S31-S33: Industrias manufactureras.
+- S43: Comercio al por mayor.
+- S46: Comercio al por menor.
+- S48-S49-S51: Transportes, correos y almacenamiento; Información en medios masivos.
+- S52-S53: Servicios financieros y de seguros; Servicios inmobiliarios y de alquiler de bienes muebles e intangibles.
+- S54-S55-S56: Servicios profesionales, científicos y técnicos; Corporativos; Servicios de apoyo a los negocios y manejo de desechos y servicios de remediación.
+- S61-S62: Servicios educativos; Servicios de salud y de asistencia social.
+- S71-S81: Servicios de esparcimiento culturales y deportivos, y otros servicios recreativos; Otros servicios excepto actividades gubernamentales
+- S72: Servicios de alojamiento temporal y de preparación de alimentos y bebidas.
+- S93: Actividades legislativas, gubernamentales, de impartición de justicia y de organismos internacionales y extraterritoriales.
+
+Se establece el directorio de trabajo y se leen los datos y se convierten los datos a series de tiempo.
+
+```{r}
+# Establecer dirección de trabajo
+path<-("C:/IGAE_MFD/")
+# Se cargan las funciones 
+source(paste(path, "functions.r", sep = ""))
+
+# Se leen los datos
+datos_IGAE<-read.csv(file = paste0(path, 'IGAE.csv'))
+
+# Se convierten a series de tiempo
+IGAE<-ts(datos_IGAE[,-1],start = c(1993, 1), frequency = 12)
+
+# Número de series
+N<-ncol(IGAE) #14 series de tiempo
+```
+
+## 1.1 Análisis exploratorio en conjunto de las series. ¿Se observan patrones comunes?
+
+Se realiza un análisis exploratorio de la serie de tiempo IGAE
+
+```{r}
+## Análisis exploratorio de las series
+# Estadística básica y valores nulos
+summary(IGAE)
+```
+Como se observa en la salida del summary, se tiene que las Actividades primarias (S11) registraron un valor promedio mensual de 91.80, minería (S21) registró un valor promedio mensual de 96.70, por su parte la serie de tiempo generación, transmisión y distribución de energía eléctrica, suministro de agua y de gas por ductos al consumidor final (S22) reportó una media de 79.44, en construcción (S23) se registró un promedio mensual de 89.40, respecto a las Industrias manufactureras (S31-S33) se tiene una media de 92.34, comercio al por mayor (S43) registró en promedio 82.61 durante el periodo registrado, respecto a la serie comercio al por menor (S46), reportó una media de 86.74 durante el periodo analizado, la serie transportes, correos y almacenamiento; Información en medios masivos (S48.S49.S51) registro una media de 85.45 en el periodo reportado, servicios financieros y de seguros; Servicios inmobiliarios y de alquiler de bienes muebles e intangibles (S52.S53) registró un promedio de 82.23, la serie servicios profesionales, científicos y técnicos; Corporativos; Servicios de apoyo a los negocios y manejo de desechos y servicios de remediación (S54.S55.S56) reportó una media de 88.73, con respecto a Servicios educativos; Servicios de salud y de asistencia social (S61-S62) se reportó en promedio 91.12, la serie servicios de esparcimiento culturales y deportivos, y otros servicios recreativos; Otros servicios excepto actividades gubernamentales (S71.S81) reportó en promedio 88.28, la serie servicios de alojamiento temporal y de preparación de alimentos y bebidas (S72) registró un promedio de 98.57 y finalmente, la serie actividades legislativas, gubernamentales, de impartición de justicia y de organismos internacionales y extraterritoriales (S93) registró un valor promedio de 93.27 durante el periodo analizado. Como se puede observar en esta base de datos, los valores promedios no varían tanto, con lo que respecto a los valores faltantes, no se registran valores faltantes.
+
+Adicionalmente, se puede usar la función *describe* para detallar algunas características más de las series de tiempo.
+
+```{r}
+describe(IGAE)
+```
+Con esta función se observa que tenemos 14 variables (series de tiempo), 343 observaciones en cada variable, vienen las medias, desviaciones estándar, medianas, valor máximo, mínimo el rango de las series, qué tan sesgadas están, la curtosis, el error estándar, entre otras, al final son 13 medidas descriptivas que nos ayudan a conocer los datos, y como se observa desde el summary, los valores de los datos no son tan variados entre las series.
+
+Continuando con el análisis descriptivo, ahora se grafican las series originales.
+
+```{r}
+# Gráfico de las series originales
+plot(IGAE[, 1:4], main = "Variables 1 a 4", 
+     xlab = "Tiempo", cex.lab = 0.75)
+```
+
+En la salida del gráfico se observa que S11 tiene un comportamiento a la alza, durante el periodo analizado, en lo que respecta a la serie S21 se observa un valor atípico (mínimo) en el 1996, después de ahí se muestra un tendencia creciente y a inicios de 2009 se muestra una tendencia a la baja, y en 2020 muestra un punto atípico, pero poco perceptible, luego, en las series S22 y S23 tienen un comportamiento similar, pues se muestra un comportamiento a la alza en el periodo analizado y en 2020 se observa que registran un valor atípico, una diferencia entre estas series es que S23 registra un valor atípico en 1995 y otra en 2020 (posiblemente por el COVID 19), sin embargo, en la serie S22 solo se registra el valor atípico del 2020 y es muy pequeño.
+
+```{r}
+# Gráfico de las series originales
+plot(IGAE[, 5:8], main = "Variables 5 a 8", 
+     xlab = "Tiempo", cex.lab = 0.75)
+```
+
+Estas series tienen un comportamiento similar entre ellas, por lo que se podría deducir que un factor común podría capturar el comportamiento de la tendencia que están presentando la mayoría de las series. De igual forma, estas 4 series podrían ser de integración uno, además de no tener problemas de estacionalidad. En las 4 series se registran 3 valores atípicos, en 1996, 2009 y el más pronunciado en 2020.
+
+```{r}
+# Gráfico de las series originales
+plot(IGAE[, 9:12], main = "Variables 9 a 12", 
+     xlab = "Tiempo", cex.lab = 0.75)
+```
+
+Con respecto a estas 4 series se observa que todas registran un comportamiento a la alza, por lo que se podría pensar que un factor común podría capturar el comportamiento de la tendencia que están presentando la mayoría de las series. De igual forma, estas 4 series podrían ser de integración uno, pero, cada una tiene particularidades, por ejemplo, la serie, S52-S53 no registra valores atípicos, la serie S54-S55-S56 al inicio de la serie como al final, se registra un comportamiento de subidas y bajadas, la serie S61-S62 registra dos valores atípicos uno muy poco perceptible  en 1995 y también en 2009, finalmente, la serie S71-S81 registra un valor atípico en 1995 tomando un valor de 70 unidades, como ya se mencionó la serie tiene un comportamiento a la alza registrando un máximo de 108.50 y luego a inicios de 2020 se reporta un valor atípico de aproximadamente 70 unidades.
+
+
+```{r}
+# Gráfico de las series originales
+plot(IGAE[, 13:14], main = "Variables 13 a 14", 
+     xlab = "Tiempo", cex.lab = 0.75)
+```
+
+Finalmente, la serie S72 tiene un comportamiento similar a las series graficadas del (5-8), es decir, con un comportamiento a la alza, por lo que se podría deducir que un factor común podría capturar el comportamiento de la tendencia que están presentando estas series. Además, de que esta serie presenta un valor atípico en el año 2020, por último, la serie S93 muestra un comportamiento a la alza, pero no presenta valores atípicos como mínimos. 
+
+De manera general se puede pensar que las 14 series podrían ser de integración uno, además de no tener problemas de estacionalidad.
+
+Ahora se hará toda la gráfica en conjunto para ver el comportamiento de la mismas.
+
+```{r}
+# Series originales
+ts.plot(IGAE, col = 1:14, main = "Series originales", 
+        xlab = "Tiempo", ylab = "Valor")
+```
+
+
+Como se muestra en la gráfica anterior, existen series que tienen un comportamiento similar, por lo que se puede pensar que uno de los factores podría capturar la forma de las series que presentan tres datos atípicos, uno en 1996, otro en 2009 y el del año 2020 además de su comportamiento a la alza en el periodo analizado. Otro factor podría capturar series es cuando el valor atípico de 1996 es un poco grande, luego, se sigue un comportamiento descendiente hasta 2010 y finalmente, se observa un comportamiento descendiente durante el resto del periodo, además de que en 2020, no se muestra un valor atípico, una serie con este comportamiento es S21, otro factor puede capturar a las series que se caracterizan por tener un crecimiento durante todo el periodo analizado, además de pequeñas subidas y bajadas durante el periodo. Finalmente, puede existir un cuarto factor que capte a las series tienen un comportamiento creciente pero muy estable en el tiempo, de forma que no tenga variaciones importantes, a lo largo del tiempo.    
+Ahora, como parte del análisis, falta descartar que haya series estacionales además de revisar la estandarización de las mismas tal como se vio en la última clase impartida por el Doctor. Francisco.
+
+Con base en lo mencionado anteriormente, ahora se analiza la estacionalidad de los datos, ya que es importante asegurarnos que efectivamente no hay estacionalidad. El método visto en clase consiste en incluir variables ficticias estacionales y comprobar si tienen valores p significativos al calcular la regresión. Si los meses individuales tienen coeficientes significativos, la serie de tiempo tiene problemas de estacionalidad. El resultado se presenta a continuación.
+
+```{r}
+# Modelo para determinar estacionalidad
+#N= 14 series, se definió anteriormente
+for(i in 1:N){
+estacionalidad_IGAE<-lm(IGAE[, i] ~ c(1:nrow(IGAE)) + seasonaldummy(IGAE[, i])) 
+# Resumen del modelo
+print(colnames(IGAE)[i])
+print(summary(estacionalidad_IGAE)) }
+```
+Revisar estacionalidad en primeras diferencias.
+Se pone el código sin embargo, no se imprimirá para no hacer tan extenso el documento.
+
+```{r, eval = FALSE}
+# Modelo para determinar estacionalidad
+N= 14 #, se definió anteriormente
+d_IGAE <- diff(IGAE)
+for(i in 1:N){
+estacionalidad_d_IGAE<-lm(d_IGAE[, i] ~ c(1:nrow(d_IGAE)) + seasonaldummy(d_IGAE[, i])) 
+# Resumen del modelo
+print(colnames(d_IGAE)[i])
+print(summary(estacionalidad_d_IGAE)) }
+```
+
+Con base en la salida previa, se puede observar que los coeficientes de las variables ficticias estacionales resultaron no ser significativas, excepto en el intercepto, por lo que no hay estacionalidad en esta serie de tiempo. Se realizó la misma prueba para los datos diferenciados (en primera diferencia) y la prueba resultó prácticamente que  ninguna variable era significativa, solo en las series (S23, S46 y S48-S49-S51) en el mes de febrero, abril y abril respectivamente, el valor p fue un poco menor a 0.05, pero con valores muy cercanos a 0.05, con este argumento y sabiendo que estos resultados son de las series diferenciadas, se concluye que tampoco no hay estacionalidad. Además, de que en clase con el doctor Francisco, solo nos interesaba que la serie original no tuviera estacionalidad. Con todos estos comentarios se concluye que las 14 series no tienen problemas de estacionalidad.
+
+En la siguiente parte del análisis, sigue aplicar alguna transformación, en este caso se aplicó la transformación logarítmica a las series con la intención de observar si la varianza tiene una mejora relevante. 
+A continuación, se hace la transformación y se compara con la serie original a fin de comparar ambas series.
+
+
+```{r}
+# Gráfico para las primeras 4 series original vs logarítmica
+series_IGAE<-cbind(IGAE[, 1:4], log(IGAE[, 1:4]))
+colnames(series_IGAE)<-rep(colnames(IGAE)[1:4], 2)
+plot(series_IGAE, cex.lab = 0.75, 
+     main = "Variables a analizar original vs logaritmo", 
+     xlab = "Tiempo",col= "blue")
+
+# Gráfico de las series 5:8 original vs logarítmica
+series_IGAE<-cbind(IGAE[, 5:8], log(IGAE[, 5:8]))
+colnames(series_IGAE)<-rep(colnames(IGAE)[5:8], 2)
+plot(series_IGAE, cex.lab = 0.75, 
+     main = "Variables a analizar original vs logaritmo", 
+     xlab = "Tiempo",col= "blue")
+
+# Gráfico de las series 9:12 original vs logarítmica
+series_IGAE<-cbind(IGAE[, 9:12], log(IGAE[, 9:12]))
+colnames(series_IGAE)<-rep(colnames(IGAE)[9:12], 2)
+plot(series_IGAE, cex.lab = 0.75, 
+     main = "Variables a analizar original vs logaritmo", 
+     xlab = "Tiempo",col= "blue")
+
+# Gráfico de las series 13 y 14 original vs logarítmica
+series_IGAE<-cbind(IGAE[, 13:14], log(IGAE[, 13:14]))
+colnames(series_IGAE)<-rep(colnames(IGAE)[13:14], 2)
+plot(series_IGAE, cex.lab = 0.75, 
+     main = "Variables a analizar 13 y 14", 
+     xlab = "Tiempo",col= "blue")
+
+```
+
+Como lo muestran las gráficas previas, del lado izquierdo se presentan las series sin ningún tipo de transformación, mientras que, del lado derecho se tienen las series transformadas con logaritmo. Como se puede apreciar, no existen cambios relevantes en cuanto a la varianza, ya que la forma de ambas series (original vs logarítmica) es prácticamente la misma. Esta situación se presentó en las 14 series de tiempo analizadas, por lo anterior, se decidió trabajar con las series sin ningún tipo de transformación.
+
+A manera de resumen se puede decir que existen series que tienen un comportamiento similar, por lo que se piensa que pueden existir 3 o 4 factores que capturen la forma de las series dependiendo de caractrísticas particulares de las series de tiempo. Es decir, podemos decir que se observan entre 3 y 4 factores comunes en las series, por lo tanto, sí se observan patrones comunes en las series.
+Después de esto, se realizaron las pruebas de estacionalidad y se observó que las series originales no son estacionales, además de que apliqué una transformación logarítmica a los datos y resultó que las series tuvieron el mismo comportamiento que el de las series originales, por lo tanto, se decidió trabajar con los datos originales.
+
+## 1.2 Prueba de raíces unitarias individuales.
+
+El siguiente paso del análisis es realizar las raíces unitarias individuales.
+Para este inciso se aplicó la prueba aumentada de *Dickey Fuller* para evaluar la posibilidad de que exista una raíz unitaria debido a la tendencia de los datos. Las hipótesis de la prueba son las siguientes:  
+
+$H_o: \text{La serie de tiempo es no estacionaria}$  
+$H_a: \text{La serie de tiempo es estacionaria}$
+
+La regla de decisión es rechazar la hipótesis nula ($H_o$) si el valor p es menor que un nivel de significancia de 0.05 ($\alpha = 0.05$). La salida de los valores p de la prueba, tanto para la serie original como en primeras diferencias se muestra a continuación.  
+
+**Nota:** En clase con el Doctor Francisco, se comentó que la la prueba va con la especificación de *"const"*.
+
+```{r, warning=FALSE}
+# Matriz para pruebas ADF
+adf_tests_IGAE<-matrix(NA, N, 2)
+# Nombres de columnas y renglones
+colnames(adf_tests_IGAE)<-c("Original", "Diferenciada")
+rownames(adf_tests_IGAE)<-colnames(IGAE)
+
+# Ciclo for para las pruebas
+for(i in 1:N){
+adf_tests_IGAE[i, "Original"]<-adf(IGAE[, i], "const")$p.value
+adf_tests_IGAE[i, "Diferenciada"]<-adf(diff(IGAE[, i]), "const")$p.value }  
+
+# Se imprime el resultado de las pruebas ADF
+kbl(adf_tests_IGAE, longtable = T, booktabs = T, 
+    caption = "Resultado de la prueba ADF", 
+    col.names = c("Sin diferenciar", "Diferenciada"), 
+    escape = TRUE, digits = 3)
+```
+
+En la salida del código, se muestra la tabla que contiene el resultado de los valores p de la prueba *ADF* tanto para la serie original como la serie diferenciada. En ella se puede observar que, las series no son estacionarias en los datos sin diferenciar, excepto en la serie *S72*, la cual si es estacionaria en la prueba sin diferencias, pues obtuvo en valor de p en la prueba de 0.01 < 0.05. 
+El resto de las series son estacionarias en primeras diferencias, por lo que su orden de integración es 1. 
+
+Otro punto relevante que se vio en clase es el tema de estandarizar las series (usado la función scale), ya que al igual que en un análisis de factores, los cambios de escala podrían afectar drásticamente los resultados.
+
+```{r}
+# Escalar las series para evitar problemas de diferentes escalas
+IGAE_est<-scale(IGAE, center = TRUE, scale = TRUE)
+
+# Gráfica de las series estandarizadas
+ts.plot(IGAE_est, col = 1:14, main = "Series escaladas", 
+        xlab = "Tiempo", ylab = "Valor")
+```
+
+Como se muestra en la gráfica anterior y como ya se comentó unos parrafos arriba, existen series que tienen un comportamiento similar, por lo que se puede pensar que uno de los factores podría capturar la forma de las series que presentan tres datos atípicos, uno en 1996, otro en 2009 y el del año 2020 además de su comportamiento a la alza en el periodo analizado. Otro factor podría capturar series es cuando el valor atípico de 1996 es un poco grande, luego, se sigue un comportamiento descendiente hasta 2010 y finalmente, se observa un comportamiento descendiente durante el resto del periodo, además de que en 2020, no se muestra un valor atípico, una serie con este comportamiento es S21, un tercer factor puede capturar a las series que se caracterizan por tener un crecimiento durante todo el periodo analizado, además de pequeñas subidas y bajadas durante el periodo. Finalmente, puede existir un cuarto factor que capte a las series tienen un comportamiento creciente pero muy estable en el tiempo, de forma que no tenga variaciones importantes, a lo largo del tiempo.    
+
+Por otro lado, como parte del análisis, falta descartar que haya series estacionales además de revisar la estandarización de las mismas tal como se vio en la última clase impartida por el Doctor. Francisco.
+
+Ahora, para ver la factibilidad de realizar un modelo de Factores Dinámicos, se calculó la dependencia efectiva muestral (vista en clase con el Dr. Francisco), que es la autocorrelación multivariada entre un conjunto de series de tiempo. Cuando este valor es cercano a 0 significa que no hay nada de dependencia entre las variables del estudio, mientras que, cuando es cercano a 1 significa que hay total dependencia entre las variables de estudio y que es viable ajustar un *MFD*. El resultado se muestra a continuación.
+
+
+```{r}
+# Dependencia efectiva muestral
+dep_efec_muest<-1 - det(cor(IGAE_est))^(1/(N-1))
+# Se imprime el resultado
+dep_efec_muest
+```
+
+Con base en la salda anterior, el valor de la dependencia efectiva muestral fue de 0.9515384, por lo que el ajuste de un modelo de factores dinámicos es muy viable. La siguiente parte del análisis consiste en calcular el número de factores que se incluirán en el modelo.
+
+
+## 1.3 Determinación del número de factores.
+
+Para la selección del número de factores en el *MFD* hay varios criterios que pueden usarse, para este ejercicio, se realizarán todos los criterios visto en clase, los cuales son: *Bai and Ng (2002)*, *Onatski (2010)* y *Ahn and Horenstein (2013)*. 
+
+**Nota:** Para realizar este ejercicio usaré las funciones vistas en clase y que fueron proporcionadas por el Dr. Francisco. 
+
+Empecemos con el criterio de información de *Bai and Ng (2002)* que es el criterio de información más popular.
+
+```{r}
+### Determinar el número de factores comunes
+# Fijar kmax
+kmax<-round(N*0.25,0)
+
+# Función de Bai and Ng
+
+# Se debe ejecutar ya que las funciones en R no la traen. Esta fucnión fue creada por el Dr. Francisco.
+bai_ng <- function(Y, kmax = kmax){
+  ic <- matrix(0, kmax + 1, 3)
+  colnames(ic) <- c("ICP1k","ICP2k", "ICP3k")
+  for(j in 0 : kmax)
+    ic[j+1, ] <- pcfest(Y, demean = 0, r = j)$ICPk
+  rhat <- apply(ic, 2, function(x) which(x == min(x)) - 1)
+  return(rhat)
+}
+
+# Bai and Ng (2002)
+
+r_est_bai_ng<-bai_ng(IGAE_est, kmax = kmax)
+r_est_bai_ng
+```
+
+Para establecer el número de factores máximos (*kmax*) del modelo, una sugerencia es colocar un cuarto (0.25) del total de las variables de estudio, que en este caso el *kmax* es 14(0.25) = 3.5, sin embargo para tener un número entero se redondeo y por tanto, se sugirieron 4 factores. De acuerdo con la salida anterior, el criterio de información de *Bai and Ng* estima que el modelo contenga 4 factores; solo se debe tener cuidado cuando este criterio toma el valor máximo fijado, pues posiblemente se tenga problemas con los errores autocorrelacionados, ya que este criterio es muy sensible a ese problema.
+
+
+Siguiendo con los demás criterios, el siguiente criterio de información fue el de *Onatski*, recordando que la idea de este criterio es que se tienen N variables (en nuestro ejemplo son 14), y esas variables se generan a través de un factor común, entonces voy a tener un valor propio muy grande y los demás serán muy pequeños. Es decir, cuando se hace la resta del primer eigenvalores con el siguiente eigenvalores, si la diferencia es grande, entonces, se está modelando la parte común, en cambio si la diferencia es cero o muy pequeña se está modelando el resto de los eigenvalores ya no es tan importante. Es decir, se hace una cota en donde se separan los eigenvalues buenos de los no tan buenos.
+
+A continuación, se muestra la salida.
+Una observación es que, *demean = 0* significa sin escalamiento, es decir, le indico que ya no le haga nada a los datos dado que ya están estandarizados.
+
+```{r}
+# Onatski (2010). 
+#Se manda a llamar a la función onatski2010, creada por el DR. Francisco.
+r_est_ed<-onatski2010(IGAE_est, demean = 0)
+r_est_ed
+```
+
+De acuerdo con la salida previa, el criterio de *Onatski* sugiere que en el modelo de factores dinámicos se incluyan un total de 4 factores.
+
+Finalmente, los criterios de información de *Ahn y Horenstein* consisten en que en lugar de hacer diferencias, hay que hacer razones de eigenvalues. Y la idea es, quedarse con la razón de eigenvalue que sea la más grande.
+
+A continuación, se muestra el código esta función, que también fue creada por el Dr. Francisco.
+
+```{r}
+# Ahn y Horenstein (2013)
+r_est_ratio<-ratio.test(IGAE_est, kmax = kmax, demean = 0)[c("ker", "kgr")]
+r_est_ratio
+```
+
+Como se muestra en la salida, se sugiere que el modelo de factores dinámicos incluya solo a 1 factor. 
+
+Como se revisó en clase, determinar el número de factores es un paso importante, porque si no se determina bien ese número, pues realmente, no sabré con cuántos factores me voy a quedar para reducir dimensionalidad. Por lo anterior y derivado del análisis exploratorio, se optó por incluir 4 factores lo cual coincide con los criterio de *Bai and Ng* y *Onatski*. Por otro lado, aunque es válido considerar a un solo factor común, no quiere decir que no se tengan más factores.
+
+## 1.4 Estimación de las componentes (matriz de pesos, factores y errores idiosincráticos) de un MFD a través de CP. Interpretación de estas.
+
+**Nota:** A pesar de que el ejercicio solo solicita la estimación de los factores por un método de componentes principales (CP), por lo visto en clase, hay 4 métodos por componente principales y también se incluye el método del Factor dinámico (Suavizado de Kalman en 2 pasos), que por las notas de clase este método no se incluye dentro de CP, en este ejercicio se decidió implementar los 5 métodos vistos en clase, para comparar los resultados entre los métodos y decidir cual estima mejor a los factores respecto a las series que estamos trabajando.
+
+a) Estimación en niveles.
+b) Estimación en diferencias. 
+c) Componentes principales generalizados (GPCE)
+d) Barigozzi.
+e) Factor dinámico (suavizado de Kalman en 2 pasos).
+
+Nuevamente, nos apoyaremos de las funciones creadas por el Dr. Francisco Corona para llevar a cabo este ejercicio.
+
+A continuación, se muestra el código implementado.
+
+**Método 1) Estimación en niveles.**
+
+El código de R se presenta enseguida.  
+
+
+```{r}
+## Método 1) Estimación en niveles
+# Número de factores
+r<-4
+# Ajuste del modelo
+pc_lev_igae_1<-pcfest(IGAE_est, r = r)
+f_est_1<-pc_lev_igae_1$Fhat
+# Hacerlo serie de tiempo
+fest_1<-ts(scale(f_est_1), start = c(1993, 1), frequency = 12)
+# Extraer las cargas
+P_est_1<-pc_lev_igae_1$lambda
+# Colocar los nombres de columna a los renglones de las cargas
+rownames(P_est_1)<-colnames(IGAE_est)
+
+# Gráfico de las cargas estimadas
+par(mfrow = c(2, 2), mar = c(4, 4, 4, 4)) #Acomodamos para mostrar el gráfico
+barplot(P_est_1[, 1], las = 3, cex.names = 0.75, col = "#FF75A0", 
+        main = "Cargas para factor 1", ylim = c(min(P_est_1[, 1]) - 0.1, 
+                                                max(P_est_1[, 1]) + 0.1))
+box()
+barplot(P_est_1[, 2], las = 3, cex.names = 0.75, col = "#FCE38A", 
+        main = "Cargas para factor 2", ylim = c(min(P_est_1[, 2]) - 0.1, 
+                                                max(P_est_1[, 2]) + 0.1))
+box()
+barplot(P_est_1[, 3], las = 3, cex.names = 0.75, col = "#6DDCCF", 
+        main = "Cargas para factor 3", ylim = c(min(P_est_1[, 3]) - 0.1, 
+                                                max(P_est_1[, 3]) + 0.1))
+box()
+barplot(P_est_1[, 4], las = 3, cex.names = 0.75, col = "#54E346", 
+        main = "Cargas para factor 4", ylim = c(min(P_est_1[, 4]) - 0.1, 
+                                                max(P_est_1[, 4]) + 0.1))
+box()
+
+```
+
+La salida anterior muestra las cargas estimadas de los factores por el método de estimación en niveles. En las gráficas el primer factor tiene pesos bastantes similares para todas las variables, excepto en *S21* que tiene carga negativa y *S72*, que aunque tiene carga positiva está debajo del promedio.
+
+Con respecto al factor 2, lo dominan de manera negativa las cargas *S21* y *S72* de hecho son las que más peso tienen, y por la parte positiva, las series *S93*, *S11* y *S52-S53* son las que dominan, sin embargo, las cargas positivas tienen menor peso en comparación con la negativas.
+
+El tercer factor es dominado de manera positiva por *S72*, y por las cargas negativas por la serie *S21*.
+
+Por último, para el caso del cuarto factor hay series que dominan de manera positiva las que más destacan son *S23*, le sigue *S22* y *S93*, y  manera negativa que las series que destacan en este cuarto factor son *S31-S33*,*S72* y *S46*.
+
+A continuación, se muestra el gráfico de factores y se obtiene lo siguiente.
+
+```{r}
+# Gráfico para los factores
+par(mfrow = c(2, 2), mar = c(3, 2, 2, 1))
+ts.plot(IGAE_est, col = "black", main = "Factor 1", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(fest_1[, 1], col = "red", lwd = 2)
+ts.plot(IGAE_est, col = "black", main = "Factor 2", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(-fest_1[, 2], col = "purple", lwd = 2)
+ts.plot(IGAE_est, col = "black", main = "Factor 3", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(fest_1[, 3], col = "#38E54D", lwd = 2) 
+ts.plot(IGAE_est, col = "black", main = "Factor 4", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(-fest_1[, 4], col = "blue", lwd = 2)
+
+```
+
+De acuerdo con la gráfica previa, se muestra la serie temporal de los factores estimados de las 14 series de tiempo que componen el IGAE. El primer factor captura la forma de las series muestran un comportamiento creciente durante toda la serie, y los tres puntos atípicos en 1996, 2009 y 2020, aunque estos datos típicos no son muy pronunciados. Este primer factor es una combinación las mayoría de de series de tiempo que conforman en IGAE. Algunas  series son: *S43: Comercio al por mayor*, *S48-S49-S51: Transportes, correos y almacenamiento; Información en medios masivos* y *S71-S81: Servicios de esparcimiento culturales y deportivos, y otros servicios recreativos; Otros servicios excepto actividades gubernamentales* entre otras.
+
+El segundo factor marca un dato atípico en 1996, luego muestra un comportamiento creciente y hasta 2009 muestra otro dato atípico, y después se muestra un comportamiento constante y hasta 2020 que vuelve a registrarse un dato atípico, es decir, este factor es dominado por las series *S72: Servicios de alojamiento temporal y de preparación de alimentos y bebidas* y *S21: Minería* y se observa que el factor hereda ese comportamiento.
+
+Con respecto al tercer factor muestra un valor atípico (máximo) en 1994, luego muestra un comportamiento ligeramente decreciente y se mantiene constante, en 2009, se muestra un punto atípico y de 2010 en adelante se nota un comportamiento creciente y hasta 2020 muestra un valor atípico después del 2020 se observa una tendencia a la alza, este factor es una combinación de varias series por lo que no hay un comportamiento particular que domine a esta serie, algunas series son: *S72: Servicios de alojamiento temporal y de preparación de alimentos y bebidas*, *S93: Actividades legislativas, gubernamentales, de impartición de justicia y de organismos internacionales y extraterritoriales*, *S21: Minería*, y *S61-S62: Servicios educativos; Servicios de salud y de asistencia social*, entre otras.
+
+Por último, el cuarto factor es una combinación de varias series, es decir, el comportamiento del factor hereda las características de varias series, algunas series que se asocian a este factor son *S23: Construcción* y  *S31-S33: Industrias manufactureras*, de hecho, estas series son las que tienen las cargas más representativas para este factor.
+
+\
+
+Seguimos analizando los demás métodos para que se puedan comparar y al final decidir cuál método por Componentes principales es mejor opción.
+
+
+**Método 2) Estimación en diferencias**  
+
+El código realizado en R se presenta a continuación.  
+
+```{r}
+## Método 2 Estimación en diferencias
+# Ajuste del modelo
+pc_dif_igae<-pcfest(diff(IGAE_est), r = r)
+f_est_2<-apply(pc_dif_igae$Fhat, 2, cumsum)
+# Hacerlo serie de tiempo
+fest_2<-ts(scale(f_est_2), start = c(1993, 1), frequency = 12)
+# Extraer las cargas
+P_est_2<-pc_dif_igae$lambda
+# Colocar los nombres de columna a los renglones de las cargas
+rownames(P_est_2)<-colnames(IGAE_est)
+
+# Gráfico de las cargas estimadas
+par(mfrow = c(2, 2), mar = c(4, 4, 4, 4)) #Acomodamos para mostrar el gráfico
+barplot(P_est_2[, 1], las = 3, cex.names = 0.75, col = "#FF75A0",
+        main = "Cargas para factor 1", ylim = c(min(P_est_2[, 1]) - 0.1, 
+                                                max(P_est_2[, 1]) + 0.1)); 
+box()
+barplot(P_est_2[, 2], las = 3, cex.names = 0.75, col = "#FCE38A", 
+        main = "Cargas para factor 2", ylim = c(min(P_est_2[, 2]) - 0.1, 
+                                                max(P_est_2[, 2]) + 0.1)); 
+box()
+barplot(P_est_2[, 3], las = 3, cex.names = 0.75, col = "#6DDCCF", 
+        main = "Cargas para factor 3", ylim = c(min(P_est_2[, 3]) - 0.1, 
+                                                max(P_est_2[, 3]) + 0.1)); 
+box()
+barplot(P_est_2[, 4], las = 3, cex.names = 0.75, col = "#54E346", 
+        main = "Cargas para factor 4", ylim = c(min(P_est_2[, 4]) - 0.1, 
+                                                max(P_est_2[, 4]) + 0.1))
+box()
+```
+
+La salida anterior muestra las cargas estimadas de los factores por el método de estimación en diferencias. En las gráficas se puede apreciar a los factores, en el caso del primer factor se encuentra dominado de forma positiva por las series *S72*, *S23* y *S31-S33*, de hecho, todas las cargas del factor 1 son positivas.
+
+Con respecto al factor 2, la carga estimada más dominante se encuentra en la serie *S11*, por lo que este factor se podría considerar como un factor dominado por *S11*, ya que el resto de las cargas son cercanas a 0.
+
+El tercer factor lo dominan de manera positiva las series *S21* y *S23*, mientras que, de manera negativa se tiene a *S72*. La demás cargas son cercanas a cero.
+
+Por último, para el caso del cuarto factor hay series que dominan de manera positiva, las que más destacan son *S72* y *S21*, y de manera negativa la serie que destaca en este cuarto factor es *S23*, las demás series reportan cargas cercanas a cero.
+
+A continuación, se muestra el gráfico de factores y se obtiene lo siguiente.
+
+```{r}
+# Gráfico para los factores
+par(mfrow = c(2, 2), mar = c(3, 2, 2, 1))
+
+ts.plot(IGAE_est, col = "black", main = "Factor 1", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(fest_2[, 1], col = "red", lwd = 2)
+ts.plot(IGAE_est, col = "black", main = "Factor 2", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(fest_2[, 2], col = "purple", lwd = 2)
+ts.plot(IGAE_est, col = "black", main = "Factor 3", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(fest_2[, 3], col = "#38E54D", lwd = 2)
+ts.plot(IGAE_est, col = "black", main = "Factor 4", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(fest_2[, 4], col = "blue", lwd = 2)
+
+```
+
+De acuerdo con la gráfica previa, se muestra la serie temporal de los factores estimados de las 14 series de tiempo que componen el IGAE. El primer factor captura la forma de las series que presentan tres datos 
+atípicos, uno en 1996, otro en 2009 y el del año 2020 además de su comportamiento a la alza, por lo que es una combinación de varias series, entre las que se encuentran: *S72: Servicios de alojamiento temporal y de preparación de alimentos y bebidas*, *S23: Construcción* y *S31-S33: Industrias manufactureras*.
+
+El segundo factor muestra un comportamiento a la alza durante toda la serie, sin embargo, este factor no muestra el comportamiento de los datos atípicos. Entonces el segundo factor al ser dominado de manera positiva por *S11: Actividades primarias*, tiende a replicar el comportamiento de esa serie.
+
+Con respecto al tercer factor muestra un valor atípico en 1996, luego muestra un comportamiento a la alza, en 2009, desciende un poco y hasta el 2015 muestra un comportamiento constante, de 2015 en adelante se muestra que la serie muestra un comportamiento decreciente, y finalmente, después del 2020 se observa una tendencia a la alza, es decir, este factor al ser dominado por la serie *S21: Minería*, y al final tiene el mismo comportamiento.
+
+Por último, el cuarto factor es una combinación de varias series, por lo que no hay un comportamiento particular que domine a este factor, las series que más se asocian a este factor son *S72: Servicios de alojamiento temporal y de preparación de alimentos y bebidas*, *S21: Minería* y *S23: Construcción*.
+
+\
+
+
+**Método 3) Componentes principales generalizados (GPCE)**  
+
+El código de R se presenta enseguida.  
+
+```{r}
+#Método 3) Componentes principales generalizados (GPCE)
+### Estimación de factores
+# Número de factores
+r<-4
+## Método de Componentes Principales Generalizados (GPCE)
+# Ajuste del modelo
+pc_lev_igae_3<-pcfest(IGAE_est, r = r)
+f_est_3<-pc_lev_igae_3$Fhat
+e_est_3<-pc_lev_igae_3$ehat
+sigma_e_est_3<-t(e_est_3) %*% e_est_3
+Ygls_igae_3<-IGAE_est %*% diag(diag(sigma_e_est_3)^(-1/2))
+# Ajuste del modelo
+pc_choi_igae_3<-pcfest(Ygls_igae_3, r = r)
+# Hacerlo serie de tiempo
+fest_3<-ts(scale(pc_choi_igae_3$Fhat), start = c(1993, 1), frequency = 12)
+# Extraer las cargas
+P_est_3<-pc_choi_igae_3$lambda
+# Colocar los nombres de columna a los renglones de las cargas
+rownames(P_est_3)<-colnames(IGAE_est)
+
+# Gráfico de las cargas estimadas
+par(mfrow = c(2, 2), mar = c(4, 4, 4, 4)) #Acomodamos para mostrar el gráfico
+barplot(P_est_3[, 1], las = 3, cex.names = 0.75, col = "#FF75A0", 
+        main = "Cargas para factor 1", ylim = c(min(P_est_3[, 1]) - 0.1, 
+                                                max(P_est_3[, 1]) + 0.1))
+box()
+barplot(P_est_3[, 2], las = 3, cex.names = 0.75, col = "#FCE38A", 
+        main = "Cargas para factor 2", ylim = c(min(P_est_3[, 2]) - 0.1, 
+                                                max(P_est_3[, 2]) + 0.1))
+box()
+barplot(P_est_3[, 3], las = 3, cex.names = 0.75, col = "#6DDCCF", 
+        main = "Cargas para factor 3", ylim = c(min(P_est_3[, 3]) - 0.1, 
+                                                max(P_est_3[, 3]) + 0.1))
+box()
+
+barplot(P_est_3[, 4], las = 3, cex.names = 0.75, col = "#54E346", 
+        main = "Cargas para factor 4", ylim = c(min(P_est_3[, 4]) - 0.1, 
+                                                max(P_est_3[, 4]) + 0.1))
+box()
+```
+
+La salida anterior muestra las cargas estimadas de los factores por el método de componentes principales generalizados (GPCE). En las gráficas se puede apreciar a los factores, por ejemplo, el primer factor se encuentra dominado de forma positiva por las series *S48.S49.S51*, *S52.S53*, *S43*, *S72*, *S22* , entre otras, en cambio, de forma negativa única serie es *S21* la cual tiene una carga considerable.
+
+Con respecto al factor 2,la carga estimada más dominante se encuentra en *S72*, por lo que se puede considerar que este factor es un factor dominante, ya que las demás cargas son cercanas a 0. A pesar de que *S21* tiene una carga positiva y *S52.S53* una negativa estas siguen siendo muy pequeñas en comparación con *S72*.
+
+El tercer factor es dominado de manera positiva por *S72*, aunque el valor es muy pequeño, y por las cargas negativas por la serie *S21*, y también la serie *S46*, aunque esta última l valor es cercano a cero
+
+Por último, para el caso del cuarto factor hay series que dominan de manera positiva, las que más destacan son *S31.S33*, le sigue *S46* y *S48.S49.S51*, y  manera negativa las series que destacan en este cuarto factor son *S23*,*S71.S81* y *S22*, siendo las cargas negativas las que son mas representativas.
+Ahora, los gráficos para los factores se presentan a continuación.
+
+```{r}
+# Gráfico para los factores
+par(mfrow = c(2, 2), mar = c(3, 2, 2, 1))
+ts.plot(IGAE_est, col = "black", main = "Factor 1", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(fest_3[, 1], col = "red", lwd = 2)
+ts.plot(IGAE_est, col = "black", main = "Factor 2", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(fest_3[, 2], col = "purple", lwd = 2)
+ts.plot(IGAE_est, col = "black", main = "Factor 3", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(-fest_3[, 3], col = "#38E54D", lwd = 2)
+ts.plot(IGAE_est, col = "black", main = "Factor 4", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(fest_3[, 4], col = "blue", lwd = 2)
+```
+
+De acuerdo con la gráfica previa, se muestra la serie temporal de los factores estimados de las 14 series de tiempo que componen el IGAE. El primer factor captura la forma de las series que presentan tres datos 
+atípicos, uno en 1996, otro en 2009 y el del año 2020 además de su comportamiento a la alza, por lo que es una combinación de varias series, entre las que se encuentran: *S48.S49.S51: Transportes, correos y almacenamiento; Información en medios masivos*, *S43: Comercio al por mayor*,*S72: Servicios de alojamiento temporal y de preparación de alimentos y bebidas* y *Comercio al por mayor* entre otras.
+
+El segundo factor tiene el comportamiento de una tendencia constante y en el año 2009, se muestra el primer datos atípico, después se recupera la tendencia constante y en 2015 se muestra un comportamiento a la alza, sin embargo, en 2020 se observa un valor atípico muy pronunciado, es decir, este factor al ser dominado por la serie *S72: Servicios de alojamiento temporal y de preparación de alimentos y bebidas*, tiene el mismo comportamiento.
+
+Con respecto al tercer factor muestra un valor atípico en 1996, luego muestra un comportamiento a la alza, en 2009, desciende un poco y hasta el 2015 muestra un comportamiento constante, de 2015 en adelante se muestra que la serie muestra un comportamiento decreciente, y finalmente, después del 2020 se observa una tendencia a la alza, es decir, este factor al ser dominado por la serie *S21: Minería*, y al final tiene el mismo comportamiento.
+
+Por último, el cuarto factor es una combinación de varias series, por lo que no hay un comportamiento particular que domine a esta serie, algunas series que se asocian a este factor son: *S31-S33: Industrias manufactureras*, *S46: Comercio al por menor*, *S23: Construcción* y  *S22: Generación, transmisión y distribución de energía eléctrica, suministro de agua y de gas por ductos al consumidor final*, entre otras.
+
+\
+
+**Método 4 Barigozzi**  
+
+El código implementado en R se muestra enseguida.
+
+```{r}
+## Método 4 Barigozzi
+
+# Ajustar modelo
+pc_dif_igae<-pcfest(diff(IGAE_est), r = r)
+# Extraer las cargas
+P_est_4<-pc_dif_igae$lambda
+# Colocar los nombres de columna a los renglones de las cargas
+rownames(P_est_4)<-colnames(IGAE_est)
+# Hacerlo serie de tiempo
+f_est_4<-IGAE_est %*% P_est_4/N
+fest_4<-ts(scale(f_est_4), start = c(1993, 1), frequency = 12)
+
+# Gráfico de las cargas estimadas
+
+par(mfrow = c(2, 2), mar = c(4, 4, 4, 4)) #Acomodamos para mostrar el gráfico
+barplot(P_est_4[, 1], las = 3, cex.names = 0.75, col = "#FF75A0", 
+        main = "Cargas para factor 1", ylim = c(min(P_est_4[, 1]) - 0.1, 
+                                                max(P_est_4[, 1]) + 0.1))
+box()
+barplot(P_est_4[, 2], las = 3, cex.names = 0.75, col = "#FCE38A", 
+        main = "Cargas para factor 2", ylim = c(min(P_est_4[, 2]) - 0.1, 
+                                                max(P_est_4[, 2]) + 0.1))
+box()
+barplot(P_est_4[, 3], las = 3, cex.names = 0.75, col = "#6DDCCF", 
+        main = "Cargas para factor 3", ylim = c(min(P_est_4[, 3]) - 0.1, 
+                                                max(P_est_4[, 3]) + 0.1))
+box()
+
+barplot(P_est_4[, 4], las = 3, cex.names = 0.75, col = "#54E346", 
+        main = "Cargas para factor 4", ylim = c(min(P_est_4[, 4]) - 0.1, 
+                                                max(P_est_4[, 4]) + 0.1))
+
+box()
+```
+
+La salida anterior muestra las cargas estimadas de los factores por el método de Barigozzi. 
+En las gráficas se puede apreciar a los factores, en el caso del primer factor se encuentra dominado de forma positiva por las series *S72*, *S23* y *S31-S33*, de hecho, todas las cargas del factor 1 son positivas.
+
+Con respecto al factor 2, la carga estimada más dominante de manera positiva se encuentra en la serie *S11*, por lo que este factor se podría considerar como un factor dominado por *S11*, ya que el resto de las cargas son cercanas a 0.
+
+El tercer factor lo dominan de manera positiva las series *S21* (esta serie es la que tiene mayor carga) y *S23*, mientras que, de manera negativa se tiene a *S72*. La demás cargas son cercanas a cero.
+
+Por último, para el caso del cuarto factor hay series que dominan de manera positiva, las que más destacan son *S72* y *S21*, y de manera negativa la serie que destaca en este cuarto factor es *S23*, las demás series reportan cargas cercanas a cero.
+
+A continuación, se muestra el gráfico de factores y se obtiene lo siguiente.
+
+
+```{r}
+# Gráfico para los factores
+par(mfrow = c(2, 2), mar = c(3, 2, 2, 1))
+ts.plot(IGAE_est, col = "black", main = "Factor 1", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(fest_4[, 1], col = "red", lwd = 2)
+ts.plot(IGAE_est, col = "black", main = "Factor 2", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(fest_4[, 2], col = "purple", lwd = 2)
+ts.plot(IGAE_est, col = "black", main = "Factor 3", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(fest_4[, 3], col = "#38E54D", lwd = 2)
+ts.plot(IGAE_est, col = "black", main = "Factor 4", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(fest_4[, 4], col = "blue", lwd = 2)
+
+```
+
+De acuerdo con la gráfica previa, se muestra la serie temporal de los factores estimados de las 14 series de tiempo que componen el IGAE. El primer factor captura la forma de las series que presentan tres datos 
+atípicos, uno en 1996, otro en 2009 y el del año 2020 además de su comportamiento a la alza, por lo que es una combinación de varias series, entre las que se encuentran: *S72: Servicios de alojamiento temporal y de preparación de alimentos y bebidas*, *S23: Construcción* y *S31-S33: Industrias manufactureras*.
+
+El segundo factor muestra un comportamiento a la alza durante toda la serie, sin embargo, este factor no muestra el comportamiento de los datos atípicos. Entonces el segundo factor al ser dominado de manera positiva por *S11: Actividades primarias*, tiende a replicar el comportamiento de esa serie.
+
+Con respecto al tercer factor muestra un valor atípico en 1996, luego muestra un comportamiento a la alza, en 2009, desciende un poco y hasta el 2015 muestra un comportamiento constante, de 2015 en adelante se muestra que la serie muestra un comportamiento decreciente, y finalmente, después del 2020 se observa una tendencia a la alza, es decir, este factor al ser dominado por la serie *S21: Minería*, y al final tiene el mismo comportamiento.
+
+Por último, el cuarto factor es una combinación de varias series, por lo que no hay un comportamiento particular que domine a este factor, las series que más se asocian a este factor son  *S23: Construcción* de manera negativa, y de manera positiva *S72: Servicios de alojamiento temporal y de preparación de alimentos y bebidas* y *S21: Minería*.
+
+\
+
+**Método 5 Factor dinámico (suavizado de Kalman en 2 pasos)**  
+Observación: Aunque este no es un método de componentes principales como tal, es un método visto en clase, así quelo pondrépara comparar.
+
+El código utilizado en R es el siguiente.  
+
+```{r, warning=FALSE}
+## Método 5 Factor dinámico (Suavizado de Kalman en 2 pasos)
+# Ajustar modelo
+modelo_fks_igae<-pckf(IGAE_est, r)
+# Hacerlo serie de tiempo
+fest_5<-ts(scale(modelo_fks_igae$Fkf), start = c(1993, 1), frequency = 12)
+# Extraer las cargas
+P_est_5<-modelo_fks_igae$C
+# Colocar los nombres de columna a los renglones de las cargas
+rownames(P_est_5)<-colnames(IGAE_est)
+
+# Gráfico de las cargas estimadas
+
+par(mfrow = c(2, 2), mar = c(4, 4, 4, 4)) #Acomodamos para mostrar el gráfico
+
+barplot(P_est_5[, 1], las = 3, cex.names = 0.75, col = "#FF75A0", 
+        main = "Cargas para factor 1", ylim = c(min(P_est_5[, 1]) - 0.1, 
+                                                max(P_est_5[, 1]) + 0.1)); 
+box()
+barplot(P_est_5[, 2], las = 3, cex.names = 0.75, col = "#FCE38A", 
+        main = "Cargas para factor 2", ylim = c(min(P_est_5[, 2]) - 0.1, 
+                                                max(P_est_5[, 2]) + 0.1)); 
+box()
+barplot(P_est_5[, 3], las = 3, cex.names = 0.75, col = "#6DDCCF", 
+        main = "Cargas para factor 3", ylim = c(min(P_est_5[, 3]) - 0.1, 
+                                                max(P_est_5[, 3]) + 0.1))
+box()
+
+barplot(P_est_5[, 4], las = 3, cex.names = 0.75, col = "#54E346", 
+        main = "Cargas para factor 4", ylim = c(min(P_est_5[, 4]) - 0.1, 
+                                                max(P_est_5[, 4]) + 0.1))
+
+box()
+```
+
+La salida anterior muestra las cargas estimadas de los factores por el método Factor dinámico (Suavizado de Kalman en 2 pasos). En las gráficas el primer factor tiene pesos bastantes similares para todas las variables, excepto en *S21* que tiene carga negativa y *S72*, que aunque tiene carga positiva está debajo del promedio.
+
+Con respecto al factor 2, lo dominan de manera negativa las cargas *S21*, *S72* y *S23* de hecho son las que más peso tienen, y por la parte positiva, las series *S93* y *S11* son las que dominan, sin embargo, las cargas positivas tienen menor peso en comparación con la negativas.
+
+El tercer factor es dominado de manera positiva por *S72*, y por las cargas negativas por la serie *S21*.
+
+Por último, para el caso del cuarto factor hay series que dominan de manera positiva las que más destacan son *S23* y *S71-S81*, y  manera negativa que las series que destacan en este cuarto factor son *S31-S33*,*S72* y las demás variables tienen cargas con tendencia al 0. 
+
+A continuación, se muestra el gráfico de factores y se obtiene lo siguiente.
+
+```{r}
+# Gráfico para los factores
+
+par(mfrow = c(2, 2), mar = c(3, 2, 2, 1))
+ts.plot(IGAE_est, col = "black", main = "Factor 1", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(fest_5[, 1], col = "red", lwd = 2)
+ts.plot(IGAE_est, col = "black", main = "Factor 2", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(-fest_5[, 2], col = "purple", lwd = 2)
+ts.plot(IGAE_est, col = "black", main = "Factor 3", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(fest_5[, 3], col = "#38E54D", lwd = 2)
+ts.plot(IGAE_est, col = "black", main = "Factor 4", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(-fest_5[, 4], col = "blue", lwd = 2)
+```
+
+De acuerdo con la gráfica previa, se muestra la serie temporal de los factores estimados de las 14 series de tiempo que componen el IGAE. El primer factor captura la forma de las series que presentan tres datos 
+atípicos, uno en 1996, otro en 2009 y el del año 2020 además de su comportamiento a la alza, por lo que es una combinación de varias series, entre las que se encuentran: *S72: Servicios de alojamiento temporal y de preparación de alimentos y bebidas*, *S23: Construcción* y *S31-S33: Industrias manufactureras*.
+
+El segundo factor captura la forma de las series que presentan tres datos atípicos, uno en 1996, otro en 2009 y el del año 2020,cabe destacar, que estos puntos atípicos  son más marcados en comparación con el factor1, además, de su comportamiento con tendencia constante durante el periodo de la serie, por lo que es una combinación de varias series, entre las que se encuentran: *S72: Servicios de alojamiento temporal y de preparación de alimentos y bebidas*, *S21: Minería* y *S23: Construcción*.
+
+Con respecto al tercer factor muestra un comportamiento constante, luego, en 2009 se muestra un dato atípico y se observa que la serie toma un comportamiento desciende un poco y a partir del 2015 muestra un comportamiento a la alza, de 2015 en adelante se muestra que la serie muestra un comportamiento decreciente, y finalmente, después del 2020 se observa una tendencia a la alza, es decir, este factor es dominado por la parte negativa por *S21: Minería* y por la parte negativa por la serie *S72: Servicios de alojamiento temporal y de preparación de alimentos y bebidas.*
+
+Por último, el cuarto factor es una combinación de varias series, por lo que no hay un comportamiento particular que domine a este factor, las series que más se asocian a este factor son *S23: Construcción*, *S71-S81: Servicios de esparcimiento culturales y deportivos, y otros servicios recreativos; Otros servicios excepto actividades gubernamentales*, *S31-S33: Industrias manufactureras* y *S72: Servicios de alojamiento temporal y de preparación de alimentos y bebidas*.
+
+\
+
+## 1.4.2 Selección del modelo. (Estimación en niveles)
+
+Como parte del análisis, ahora sigue realizar la selección del modelo, es decir, de los 5 modelos con ¿Cuál se elegiría?. 
+
+Con base en las estimaciones realizadas con los 5 métodos analizados, en todos ellos el primer factor resulta ser una combinación de la mayoría de las entidades y parece ser de orden de integración uno, el resto también parece tener un orden de integración de 1. Con respecto al análisis previo, se considera que los 5 métodos presentan resultados parecidos entre ellos, sin embargo, los métodos 1) Estimación en niveles, 3)Componentes principales generalizados (GPCE) y 5)Factor dinámico (suavizado de Kalman en 2 pasos) tienen resultados muy parecidos tanto en las cargas como en la forma de los factores.
+
+En una primera selección, se tiene que en el método Factor dinámico (suavizado de Kalman en 2 pasos) tiene la característica de que los factores no son estacionarios una de las sugerencias realizadas por el Dr. Francisco es utilizar el método del factor dinámico. Sin embargo, como este método no corresponde a un método de componentes principales, entonces, nos queda seleccionar entre los 4 métodos restantes. Pero como se mencionó hace un momento, los métodos que se parecen más al 5)Factor dinámico (suavizado de Kalman en 2 pasos)  y que son estimados  por Componentes Principales son 1) Estimación en niveles y 3)Componentes principales generalizados (GPCE).
+
+En esta ocasión decidí seleccionar el método por Componentes Principales de **Estimación en Niveles**, dado las cargas de los factores además, de que este método puede explicar lo observado con respecto a las seres del IGAE. En este caso con las series que conforman el IGAE, el primer factor es es una combinación lineal del comportamiento de varias series, y con base en las gráficas de tiempos de las 14 series, se observa que en efecto, la mayoría de las series tienen la misma forma, con respeto a los otros 3 factores estos rescatan información sobre las particularidades más sobresalientes del conjunto de series. Por lo tanto, aunque los 5 métodos registran características muy similares de los 4 factores.
+Otro punto importante para comentar es que se calcularon los errores de estimación de los métodos y resultó que el Método de Estimación en Niveles y el de Factor dinámico (suavizado de Kalman en 2 pasos) arrojaron que los errores idiosincráticos eran estacionarios, es decir, arrojaron resultados válidos.
+
+**Método Estimación en niveles.**
+
+```{r}
+## Método 1) Estimación en niveles
+# Número de factores
+r<-4
+# Ajuste del modelo
+pc_lev_igae_1<-pcfest(IGAE_est, r = r)
+f_est_1<-pc_lev_igae_1$Fhat
+# Hacerlo serie de tiempo
+fest_1<-ts(scale(f_est_1), start = c(1993, 1), frequency = 12)
+# Extraer las cargas
+P_est_1<-pc_lev_igae_1$lambda
+# Colocar los nombres de columna a los renglones de las cargas
+rownames(P_est_1)<-colnames(IGAE_est)
+
+# Gráfico de las cargas estimadas
+par(mfrow = c(2, 2), mar = c(4, 4, 4, 4)) #Acomodamos para mostrar el gráfico
+barplot(P_est_1[, 1], las = 3, cex.names = 0.75, col = "#FF75A0", 
+        main = "Cargas para factor 1", ylim = c(min(P_est_1[, 1]) - 0.1, 
+                                                max(P_est_1[, 1]) + 0.1))
+box()
+barplot(P_est_1[, 2], las = 3, cex.names = 0.75, col = "#FCE38A", 
+        main = "Cargas para factor 2", ylim = c(min(P_est_1[, 2]) - 0.1, 
+                                                max(P_est_1[, 2]) + 0.1))
+box()
+barplot(P_est_1[, 3], las = 3, cex.names = 0.75, col = "#6DDCCF", 
+        main = "Cargas para factor 3", ylim = c(min(P_est_1[, 3]) - 0.1, 
+                                                max(P_est_1[, 3]) + 0.1))
+box()
+barplot(P_est_1[, 4], las = 3, cex.names = 0.75, col = "#54E346", 
+        main = "Cargas para factor 4", ylim = c(min(P_est_1[, 4]) - 0.1, 
+                                                max(P_est_1[, 4]) + 0.1))
+box()
+
+```
+
+La salida anterior muestra las cargas estimadas de los factores por el método de estimación en niveles. En las gráficas el primer factor tiene pesos bastantes similares para todas las variables, excepto en *S21* que tiene carga negativa y *S72*, que aunque tiene carga positiva está debajo del promedio.
+
+Con respecto al factor 2, lo dominan de manera negativa las cargas *S21* y *S72* de hecho son las que más peso tienen, y por la parte positiva, las series *S93*, *S11* y *S52-S53* son las que dominan, sin embargo, las cargas positivas tienen menor peso en comparación con la negativas.
+
+El tercer factor es dominado de manera positiva por *S72*, y por las cargas negativas por la serie *S21*.
+
+Por último, para el caso del cuarto factor hay series que dominan de manera positiva las que más destacan son *S23*, le sigue *S22* y *S93*, y  manera negativa que las series que destacan en este cuarto factor son *S31-S33*,*S72* y *S46*.
+
+A continuación, se muestra el gráfico de factores y se obtiene lo siguiente.
+
+```{r}
+# Gráfico para los factores
+par(mfrow = c(2, 2), mar = c(3, 2, 2, 1))
+ts.plot(IGAE_est, col = "black", main = "Factor 1", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(fest_1[, 1], col = "red", lwd = 2)
+ts.plot(IGAE_est, col = "black", main = "Factor 2", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(-fest_1[, 2], col = "purple", lwd = 2)
+ts.plot(IGAE_est, col = "black", main = "Factor 3", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(fest_1[, 3], col = "#38E54D", lwd = 2) 
+ts.plot(IGAE_est, col = "black", main = "Factor 4", 
+        xlab = "Tiempo", ylab = "Valor")
+lines(-fest_1[, 4], col = "blue", lwd = 2)
+
+```
+
+De acuerdo con la gráfica previa, se muestra la serie temporal de los factores estimados de las 14 series de tiempo que componen el IGAE. El primer factor captura la forma de las series muestran un comportamiento creciente durante toda la serie, y los tres puntos atípicos en 1996, 2009 y 2020, aunque estos datos típicos no son muy pronunciados. Este primer factor es una combinación las mayoría de de series de tiempo que conforman en IGAE. Algunas  series son: *S43: Comercio al por mayor*, *S48-S49-S51: Transportes, correos y almacenamiento; Información en medios masivos* y *S71-S81: Servicios de esparcimiento culturales y deportivos, y otros servicios recreativos; Otros servicios excepto actividades gubernamentales* entre otras.
+
+El segundo factor marca un dato atípico en 1996, luego muestra un comportamiento creciente y hasta 2009 muestra otro dato atípico, y después se muestra un comportamiento constante y hasta 2020 que vuelve a registrarse un dato atípico, es decir, este factor es dominado por las series *S72: Servicios de alojamiento temporal y de preparación de alimentos y bebidas* y *S21: Minería* y se observa que el factor hereda ese comportamiento.
+
+Con respecto al tercer factor muestra un valor atípico (máximo) en 1994, luego muestra un comportamiento ligeramente decreciente y se mantiene constante, en 2009, se muestra un punto atípico y de 2010 en adelante se nota un comportamiento creciente y hasta 2020 muestra un valor atípico después del 2020 se observa una tendencia a la alza, este factor es una combinación de varias series por lo que no hay un comportamiento particular que domine a esta serie, algunas series son: *S72: Servicios de alojamiento temporal y de preparación de alimentos y bebidas*, *S93: Actividades legislativas, gubernamentales, de impartición de justicia y de organismos internacionales y extraterritoriales*, *S21: Minería*, y *S61-S62: Servicios educativos; Servicios de salud y de asistencia social*, entre otras.
+
+Por último, el cuarto factor es una combinación de varias series, es decir, el comportamiento del factor hereda las características de varias series, algunas series que se asocian a este factor son *S23: Construcción* y  *S31-S33: Industrias manufactureras*, de hecho, estas series son las que tienen las cargas más representativas para este factor.
+
+Una vez estimadas las cargas y los factores, lo que sigue es realizar la prueba aumentada de *Dickey Fuller* con la intención de determinar el orden de integración de los 4 factores estimados. Las hipótesis de la prueba son las siguientes:
+
+$H_o: \text{El factor es no estacionario}$  
+$H_a: \text{El factor es estacionario}$
+
+La regla de decisión es rechazar la hipótesis nula ($H_o$) si el valor p es menor que un nivel de significancia de 0.05 ($\alpha = 0.05$). La salida de los valores p de la prueba, tanto para el factor original como diferenciado se muestra a continuación.  
+
+
+Prueba si el factor es unitario, con la determinación de constante.
+
+```{r,warning= FALSE}
+# Matriz para pruebas ADF
+adf_tests_igae<-matrix(NA, ncol(fest_1), 2)
+# Nombres de columnas y renglones
+colnames(adf_tests_igae)<-c("Original", "Diferenciada")
+rownames(adf_tests_igae)<-c(paste0("F", 1:4))
+
+# Ciclo for para las pruebas
+for(i in 1:ncol(fest_1)){
+adf_tests_igae[i, 1]<-adf(fest_1[, i], "const")$p.value
+adf_tests_igae[i, 2]<-adf(diff(fest_1[, i]), "const")$p.value }  
+
+# Se imprime el resultado de las pruebas ADF
+kbl(adf_tests_igae, longtable = T, booktabs = T, 
+    caption = "Resultado de la prueba ADF", 
+    col.names = c("Original", "Diferenciada"), 
+    escape = TRUE, digits = 3)
+```
+
+Como se muestra en la tabla, se observan los valores p de la prueba *ADF* tanto para el factor original como diferenciado. Se observa que los los 4 factores no son estacionarios originalmente, sin embargo, en las primeras diferencias, los 4 factores obtuvieron un p value de 0.01, es decir, son estacionarios, por lo que, los factore estimados son de orden de integración 1.  
+
+Además, se aplicó la prueba *panic.f*, que está incluida en las funciones proporcionadas por el Dr. Francisco. De acuerdo con lo visto en clase, la prueba *panic.f* retorna *m number of non-stationary common factors* (m número de factores comunes no estacionarios). A continuación, se muestra la prueba.
+
+```{r}
+# Número de factores comunes no estacionarios  
+panic.f(fest_1)
+```
+
+Como se muestra en la salida anterior, para el modelo de factores dinámicos ajustado por el método del *Estimación en niveles*, el número de factores comunes no estacionarios es de 4.
+
+
+Ahora se analizan los factores para ver si capturaron algún tipo de estacionalidad. Como lo hemos mencionado anteriormente, el método visto en clase, consiste en incluir variables ficticias estacionales y comprobar si tienen p valores significativos al calcular la regresión. Si los meses individuales tienen coeficientes significativos, el factor tiene problemas de estacionalidad. A continuación, se muestra el código.
+
+```{r}
+# Modelo para determinar estacionalidad
+for(i in 1:ncol(fest_1)){
+estacionalidad_factores<-lm(fest_1[, i] ~ c(1:nrow(fest_1)) + seasonaldummy(fest_1[, i])) 
+# Resumen del modelo
+print(paste0("F", 1:4)[i])
+print(summary(estacionalidad_factores)) }
+```
+Como se observa en al salida anterior, se muestra que las variables ficticias estacionales ajustadas a cada uno de los factores no resultaron significativos en los modelos de regresión, por lo que los factores no capturaron ningún tipo de estacionalidad. Es decir, los factores no son estacionales.
+
+Como ejercicio, complementario se realiza la prueba con los factores diferenciados. Se pone el código aunque no se imprime el resultado para no hacer tan extenso el documento.
+
+
+```{r, eval = FALSE}
+# Serie diferenciada para analizar estacionalidad
+
+fact_dif<-diff(fest_1)
+
+# Modelo para determinar estacionalidad
+for(i in 1:ncol(fest_1)){
+estacionalidad_factores_dif<-lm(fact_dif[, i] ~ c(1:nrow(fact_dif)) + seasonaldummy(fact_dif[, i])) 
+# Resumen del modelo
+print(paste0("F", 1:4)[i])
+print(summary(estacionalidad_factores_dif)) }
+
+```
+
+En la salida del código anterior, las variables ficticias estacionales ajustadas a cada uno de los factores no resultaron significativos en los modelos de regresión con los factores diferenciados, por lo que los factores no presentan problemas de estacionalidad. Ehhh.
+
+Continuando con el análisis y como siempre se ha realizado, ahora se realiza la prueba de estacionariedad a los errores idiosincráticos, pero, antes de comenzar con la prueba formal, se generó el gráfico de los errores el cual debería verse como series estacionarias. El resultado se presenta a continuación.  
+
+```{r}
+## Probar si los errores idiosincráticos son I(0)
+# Ajuste del modelo de estimación en niveles
+pc_lev_igae_1<-pcfest(IGAE_est, r = r)
+f_est_1<-pc_lev_igae_1$Fhat
+# Hacerlo serie de tiempo
+fest_1<-f_est_1
+# Extraer las cargas
+P_est_1<-pc_lev_igae_1$lambda
+
+# Cálculo de los errores
+ehat_igae<-IGAE_est - fest_1%*%t(P_est_1)
+# Prueba visual se debe ver estacionario
+ts.plot(ehat_igae, main = "Errores idiosincráticos", xlab = "Tiempo", ylab = "Valor")
+abline(h = 0, col = "red", lty = 2, lwd = 2)
+
+```
+
+
+De acuerdo con la gráfica previa, la gran mayoría de las series de los errores tienen un comportamiento de una serie estacionaria a simple vista, no obstante, se realizó la prueba para la estacionariedad a los errores idiosincráticos, cuyas hipótesis son las siguientes:  
+
+$H_o: \text{Existe raíz unitaria múltiple en los errores idiosincráticos}$  
+$H_a: \text{No existe raíz unitaria múltiple en los errores idiosincráticos}$
+
+La regla de decisión es rechazar $H_o$ si el valor p es menor que 0.05 ($\alpha = 0.05$). El resultado de la prueba se presenta enseguida.  
+La prueba *pooled* se usa para realizar varias pruebas, esta fucniopn también fue cerada por el Dr.Francisco.
+
+```{r, warning=FALSE}
+# Prueba de estacionariedad a los errores idiosincráticos
+
+pooled.test(ehat_igae) # 0.0000 
+```
+
+De acuerdo con la salida anterior, el valor p es de 0.0000  < 0.05, por lo que se rechaza $H_o$, es decir, existe suficiente evidencia para determinar que no existe raíz unitaria múltiple en los errores idiosincráticos, es decir, que los errores $e_t$ ~ I(0).
+
+
+## 1.5 ¿Es consistente la estimación? ¿Por qué?
+
+La respuesta es que la estimación sí es consistente, ya que para que la estimación sea consistente la prueba de estacionariedad a los errores idiosincráticos debe arrojar que no existe raíz unitaria múltiple en los errores idiosincráticos, lo cual se confirmó con la prueba realizada.
+
+Además,  de que el modelo ajustado por el método de Estimación en niveles resulta útil cuando los factores tienen orden de integración $I(1)$, lo cual se determinó con las pruebas univariadas ADF a los factores estimados, además, los errores idiosincráticos deben ser estacionarios, lo cual se confirmó. Adicionalmente, se revisó que los factores no tuvieran indicios de estacionalidad, lo cual también se conformó a través de los modelos de regresión ajustados. Otro hecho relevante es que se usaron los 5 modelos vistos en clase y las estimaciones de los factores fueron bastante similares, en particular en el factor 1.
+
+
