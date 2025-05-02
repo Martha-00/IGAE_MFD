@@ -15,7 +15,8 @@ El propósito principal es modelar la estructura común entre las series tempora
 
 1. `IGAE_MFD.RMD`: archivo principal en R Markdown, donde se desarrolla el modelo.
 2. `IGAE_MFD.pdf`: versión en PDF del archivo anterior, lista para consulta o difusión.
-3. `IGAE`: base de datos con las 14 series temporales que conforman al IGAE, descargadas del portal de INEGI.
-4. `CIMAT_INEGI.png`: logotipo institucional del INEGI y CIMAT utilizado en el documento.
+3. `functions.R`: archivo en R que contiene funciones que se utilizaron durante el desarrollo del modelo.
+4. `IGAE`: base de datos con las 14 series temporales que conforman al IGAE, descargadas del portal de INEGI.
+5. `CIMAT_INEGI.png`: logotipo institucional del INEGI y CIMAT utilizado en el documento.
 
 Información de contacto Autora: Martha Aguilar Jiménez, Correo electrónico:martha.aguilar@cimat.mx
